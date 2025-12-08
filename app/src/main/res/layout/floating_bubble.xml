@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/bubbleLayout"
-    android:orientation="vertical"
-    android:padding="10dp"
-    android:background="@drawable/bubble_bg"
-    android:layout_width="60dp"
-    android:layout_height="60dp">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="6dp">
 
     <ImageView
         android:id="@+id/bubbleIcon"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:src="@drawable/ic_volume"
-        android:scaleType="centerInside"/>
-</LinearLayout>
+        android:contentDescription="Volume bubble"
+        android:background="@drawable/bubble_bg"
+        android:scaleType="centerInside" />
+</FrameLayout>
+

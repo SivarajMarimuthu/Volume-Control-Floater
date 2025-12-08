@@ -1,20 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
-
-    <!-- White stroke keeps bubble visible in dark mode -->
-    <stroke
-        android:width="2dp"
-        android:color="#FFFFFFFF" />
-
-    <!-- Gradient background for visibility on all themes -->
-    <gradient
-        android:startColor="#FF4CAF50"
-        android:endColor="#FF1B5E20"
-        android:angle="90" />
-
-    <size
-        android:width="50dp"
-        android:height="50dp" />
-
+    <solid android:color="#FF3DDC84"/>
+    <stroke android:width="2dp" android:color="#FFFFFFFF"/>
+    <size android:width="56dp" android:height="56dp"/>
 </shape>
+
+

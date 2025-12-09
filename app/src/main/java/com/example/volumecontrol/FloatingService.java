@@ -1,3 +1,4 @@
+// FloatingService.java (replace or update your existing service with this)
 package com.example.volumecontrol;
 
 import android.app.*;
@@ -14,10 +15,14 @@ import android.widget.ImageView;
 
 public class FloatingService extends Service {
 
+    public static final String ACTION_UPDATE_BUBBLE = "com.example.volumecontrol.UPDATE_BUBBLE";
+
     private WindowManager wm;
     private View bubble;
     private AudioManager audio;
     private WindowManager.LayoutParams bubbleParams;
+
+    private BroadcastReceiver updateReceiver;
 
     private long lastTap = 0;
     private boolean isHidden = false;
@@ -35,6 +40,17 @@ public class FloatingService extends Service {
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
         audio = (AudioManager) getSystemService(AUDIO_SERVICE);
 
+        // register receiver for runtime updates (size change)
+        IntentFilter f = new IntentFilter(ACTION_UPDATE_BUBBLE);
+        updateReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                // read new size and apply
+                applySizeFromPrefs();
+            }
+        };
+        registerReceiver(updateReceiver, f);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
             Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     Uri.parse("package:" + getPackageName()));
@@ -47,21 +63,29 @@ public class FloatingService extends Service {
         startForegroundServiceCompat();
     }
 
-    private void createBubble() {
-        bubble = LayoutInflater.from(this).inflate(R.layout.floating_bubble, null);
+    private int getSavedBubbleDp() {
+        SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
+        return prefs.getInt("bubble_size", 56); // default 56dp
+    }
 
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    private void createBubble() {
+        // inflate
+        bubble = LayoutInflater.from(this).inflate(R.layout.floating_bubble, null);
         ImageView icon = bubble.findViewById(R.id.bubbleIcon);
 
-        // Apply round shape (never override with setBackgroundColor)
+        // ensure circular background from drawable
         bubble.setBackgroundResource(R.drawable.bubble_bg);
         bubble.setClipToOutline(true);
 
-        // ---- Load size from Settings ----
-        SharedPreferences prefs = getSharedPreferences("settings", MODE_PRIVATE);
-        int bubbleSizeDp = prefs.getInt("bubble_size", 56); // default medium
-        int bubbleSizePx = (int)(bubbleSizeDp * getResources().getDisplayMetrics().density);
+        // read size
+        int bubbleSizeDp = getSavedBubbleDp();
+        int bubbleSizePx = dpToPx(bubbleSizeDp);
 
-        // ---- Create LayoutParams with size ----
+        // LayoutParams using size from prefs
         bubbleParams = new WindowManager.LayoutParams(
                 bubbleSizePx,
                 bubbleSizePx,
@@ -118,7 +142,7 @@ public class FloatingService extends Service {
                         bubbleParams.x = initX + dx;
                         bubbleParams.y = initY + dy;
 
-                        wm.updateViewLayout(bubble, bubbleParams);
+                        try { wm.updateViewLayout(bubble, bubbleParams); } catch (Exception ignored){ }
                         return true;
 
                     case MotionEvent.ACTION_UP:
@@ -135,6 +159,32 @@ public class FloatingService extends Service {
         });
 
         autoHide();
+    }
+
+    /** Apply current saved size while service is running */
+    private void applySizeFromPrefs() {
+        if (bubbleParams == null || bubble == null) return;
+
+        int bubbleSizeDp = getSavedBubbleDp();
+        int bubbleSizePx = dpToPx(bubbleSizeDp);
+
+        // update params
+        bubbleParams.width = bubbleSizePx;
+        bubbleParams.height = bubbleSizePx;
+
+        // If bubble has been snapped to edge previously, adjust x so it still fits on screen
+        DisplayMetrics metrics = new DisplayMetrics();
+        wm.getDefaultDisplay().getMetrics(metrics);
+        int screenW = metrics.widthPixels;
+        if (bubbleParams.x > screenW - bubbleParams.width) {
+            bubbleParams.x = screenW - bubbleParams.width;
+        }
+
+        try {
+            wm.updateViewLayout(bubble, bubbleParams);
+        } catch (Exception e) {
+            // update may fail if view not attached; ignore safely
+        }
     }
 
     private void handleTap() {
@@ -164,7 +214,7 @@ public class FloatingService extends Service {
             bubbleParams.x = 0;  // Left
         }
 
-        wm.updateViewLayout(bubble, bubbleParams);
+        try { wm.updateViewLayout(bubble, bubbleParams); } catch (Exception ignored){}
     }
 
     private void autoHide() {
@@ -184,7 +234,6 @@ public class FloatingService extends Service {
     }
 
     private void startForegroundServiceCompat() {
-
         String channelId = "bubble_channel";
         String name = "Volume Bubble";
 
@@ -205,6 +254,17 @@ public class FloatingService extends Service {
                 .build();
 
         startForeground(1, n);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        try {
+            unregisterReceiver(updateReceiver);
+        } catch (Exception ignored) {}
+        try {
+            if (bubble != null) wm.removeView(bubble);
+        } catch (Exception ignored) {}
     }
 
     @Override
